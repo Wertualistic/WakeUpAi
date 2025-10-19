@@ -1,53 +1,143 @@
+import React, { useEffect } from "react";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { AlarmScreen } from "./screens/AlarmScreen";
+import { ClockScreen } from "./screens/ClockScreen";
+import { TimerScreen } from "./screens/TimerScreen";
+import { StopwatchScreen } from "./screens/StopWatchScreen";
 import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
-import { Stack, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import "react-native-reanimated";
+  AlarmIcon,
+  ClockIcon,
+  TimerIcon,
+  StopwatchIcon,
+} from "../components/icons";
 import * as Notifications from "expo-notifications";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useEffect } from "react";
+import * as Device from "expo-device";
+import { Platform } from "react-native";
+import {
+  NavigationContainer,
+  createNavigationContainerRef,
+} from "@react-navigation/native";
+import { MathProblemScreen } from "./screens/MathProblemScreen";
 
-// Configure how notifications behave
+type RootStackParamList = {
+  Alarm: undefined;
+  Clock: undefined;
+  Timer: undefined;
+  Stopwatch: undefined;
+  MathProblem: undefined;
+};
+
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+// ✅ Notification behavior (fixed)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: true,
+    shouldSetBadge: false,
     shouldShowBanner: true,
     shouldShowList: true,
   }),
 });
 
-export const unstable_settings = {
-  anchor: "(tabs)",
-};
+// ✅ Register notifications function
+export async function registerForPushNotificationsAsync() {
+  if (Device.isDevice) {
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== "granted") {
+      alert("Permission not granted for notifications!");
+      return;
+    }
+  }
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("alarms", {
+      name: "Alarms",
+      importance: Notifications.AndroidImportance.MAX,
+      sound: "default",
+      vibrationPattern: [250, 250, 500],
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    });
+  }
+}
+
+const Tab = createBottomTabNavigator<RootStackParamList>();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const router = useRouter();
-
-  // 🚀 When user taps the notification, go to /alarm
+  // ✅ Auto-register on app start
   useEffect(() => {
+    registerForPushNotificationsAsync();
+
     const sub = Notifications.addNotificationResponseReceivedListener(() => {
-      router.push("/alarm");
+      // When user taps the alarm notification
+      navigationRef.current?.navigate("MathProblem");
     });
 
     return () => sub.remove();
   }, []);
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="modal"
-          options={{ presentation: "modal", title: "Modal" }}
-        />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: "#1a1a2e",
+        },
+        headerTintColor: "#fff",
+        tabBarStyle: {
+          backgroundColor: "#1a1a2e",
+          borderTopColor: "#2d2d44",
+        },
+        tabBarActiveTintColor: "#e8ff59",
+        tabBarInactiveTintColor: "#8888a0",
+      }}>
+      <Tab.Screen
+        name="Alarm"
+        component={AlarmScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <AlarmIcon color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Clock"
+        component={ClockScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <ClockIcon color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Timer"
+        component={TimerScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <TimerIcon color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Stopwatch"
+        component={StopwatchScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <StopwatchIcon color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="MathProblem"
+        component={MathProblemScreen}
+        options={{ tabBarButton: () => null }}
+      />
+    </Tab.Navigator>
   );
 }
